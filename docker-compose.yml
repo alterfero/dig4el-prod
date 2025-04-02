@@ -45,8 +45,8 @@ services:
       - nginx
     volumes:
       - certbot_certs:/etc/letsencrypt
-    entrypoint: /bin/bash
-    # We'll run certbot manually once, or on a schedule (cron job, etc.)
+    entrypoint: /bin/sh
+
 
 volumes:
   db_data:
