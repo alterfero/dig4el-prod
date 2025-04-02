@@ -45,8 +45,6 @@ services:
       - nginx
     volumes:
       - certbot_certs:/etc/letsencrypt
-    entrypoint: /bin/sh
-
 
 volumes:
   db_data:
