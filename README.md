@@ -17,6 +17,10 @@ Make sure docker-compose is also available
 ```
 sudo apt-get install docker-compose-plugin
 ```
+The command `sudo docker compose version` should return a version 2.x.x
+Otherwise, if version is 1.x.x or there is an error message telling you that `compose` is not 
+a docker command, installl the v2 plugin (quick online search for 'install and enable docker-compose v2 plugin'
+will point you to the process.)
 
 2. Open ports
 - Ports 8501 (Streamlit) and 5342 (Postgres) if the service is directly exposed with http
@@ -25,6 +29,8 @@ Using Ubuntu *Uncomplicated Firewall*:
 Verify its status with `sudo ufw status`
 Enable of not yet enabled with `sudo ufw enable`
 ```
+sudo ufw allow http
+sudo ufw allow https
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 ```
@@ -54,24 +60,49 @@ To install and enable Nginx
 Nginx will be installed and mounted automatically via docker-compose. 
 the `nginx.conf` file can be adapted if needed. 
 
-6. Obtain the SSL certificates via Certbot and Certificate Authority let`s encrypt
-Here, build and run all containers first with 
+6. Here, build and run all containers first with 
 ```
-docker-compose up --build -d
+sudo docker compose build
+sudo docker compose up -d
 ```
-Then stop the Nginx container (freeing port 80) and run Certbot in standalone mode to prove domain ownership.
+After a while you should see in the terminal
 ```
-docker compose stop nginx
-docker compose run --rm certbot certonly --standalone \
+[+] Running 4/4
+ ✔ Container dig4el_logic_ui  Started                                                                                                                                                0.5s 
+ ✔ Container nginx_proxy      Started                                                                                                                                                0.7s 
+ ✔ Container certbot          Started                                                                                                                                                1.1s 
+ ✔ Container authdb           Started  
+```
+
+7. Obtain the SSL certificates via Certbot and Certificate Authority let`s encrypt
+Stop the Nginx container (freeing port 80) and run Certbot in standalone mode to prove domain ownership.
+
+```
+sudo docker compose stop nginx
+sudo docker compose run --rm certbot certonly --standalone \
     --agree-tos --no-eff-email --email sebastien.christian@doctorant.upf.pf \
     -d dig4el.upf.pf -d www.dig4el.upf.pf
 ```
 This writes certificates into the shared volume certbot_certs:/etc/letsencrypt/
 Then start Nginx again
 ```
-docker compose up -d nginx
+sudo docker compose start nginx
 ```
-Nginx should now find the certs at /etc/letsencrypt/live/dig4el.upf.pf/
+Then add this to `nginx.conf`:
+```
+server {
+    listen 443 ssl;
+    server_name dig4el.upf.pf www.dig4el.upf.pf;
+
+    ssl_certificate /etc/letsencrypt/live/dig4el.upf.pf/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/dig4el.upf.pf/privkey.pem;
+
+    location / {
+        proxy_pass http://app:8501;
+        ...
+    }
+}
+```
 
 Certificates are valid for ~90 days. A cron job can be set to automate the renewal
 In the repository, `renew_certs_standalone.sh` is a script designed to go through the sequence 
