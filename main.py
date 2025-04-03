@@ -3,13 +3,18 @@ import streamlit as st
 from models import init_db
 from user_service import register_user, authenticate_user
 
-def main():
-    st.title("Simple Authentication Demo")
+st.set_page_config(
+    page_title="DIG4EL",
+    page_icon="🧊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-    # Initialize DB tables on startup
-    if st.button("Initialize DB (first run)"):
-        init_db()
-        st.success("Database initialized!")
+def main():
+
+    st.header("DIG4EL")
+    st.markdown("### Digital Inferential Grammars for Endangered Languages")
+    st.markdown('*Site in construction*')
 
     # Registration
     st.header("Register")

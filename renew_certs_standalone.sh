@@ -10,7 +10,12 @@ echo "Stopping Nginx container..."
 docker compose stop nginx
 
 echo "Attempting to renew certificates..."
-docker compose run --rm certbot renew
+sudo docker run --rm -it -p 80:80 \
+   -v /etc/letsencrypt:/etc/letsencrypt \
+   certbot/certbot:latest certonly --standalone \
+   --agree-tos --no-eff-email \
+   --email sebastien.christian@doctorant.upf.pf \
+   -d dig4el.upf.pf
 
 echo "Restarting Nginx container..."
 docker compose up -d nginx

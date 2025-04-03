@@ -65,43 +65,37 @@ the `nginx.conf` file can be adapted if needed.
 sudo docker compose build
 sudo docker compose up -d
 ```
-After a while you should see in the terminal
-```
-[+] Running 4/4
- ✔ Container dig4el_logic_ui  Started                                                                                                                                                0.5s 
- ✔ Container nginx_proxy      Started                                                                                                                                                0.7s 
- ✔ Container certbot          Started                                                                                                                                                1.1s 
- ✔ Container authdb           Started  
-```
 
 7. Obtain the SSL certificates via Certbot and Certificate Authority let`s encrypt
-Stop the Nginx container (freeing port 80) and run Certbot in standalone mode to prove domain ownership.
+Stop the Nginx container (freeing port 80) and run Certbot in standalone mode, providing it access
+to port 80 to prove domain ownership.
 
 ```
-sudo docker compose stop nginx
-sudo docker compose run --rm certbot certonly --standalone \
-    --agree-tos --no-eff-email --email sebastien.christian@doctorant.upf.pf -d dig4el.upf.pf
-    
-```
-This writes certificates into the shared volume certbot_certs:/etc/letsencrypt/
-Then start Nginx again
-```
-sudo docker compose start nginx
-```
-Then add this to `nginx.conf`:
-```
-server {
-    listen 443 ssl;
-    server_name dig4el.upf.pf www.dig4el.upf.pf;
+sudo docker compose down
 
-    ssl_certificate /etc/letsencrypt/live/dig4el.upf.pf/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/dig4el.upf.pf/privkey.pem;
+sudo docker run --rm -it -p 80:80 \
+   -v /etc/letsencrypt:/etc/letsencrypt \
+   certbot/certbot:latest certonly --standalone \
+   --agree-tos --no-eff-email \
+   --email sebastien.christian@doctorant.upf.pf \
+   -d dig4el.upf.pf
+```
+This writes certificates into the shared volume: 
+ssl_certificate /etc/letsencrypt/live/dig4el.upf.pf/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/dig4el.upf.pf/privkey.pem;
 
-    location / {
-        proxy_pass http://app:8501;
-        ...
-    }
-}
+Then start the containers again
+```
+sudo docker compose up -d
+```
+You should see
+```
+[+] Running 5/5
+ ✔ Network dig4el_default     Created                                                                                                                                             0.1s 
+ ✔ Container authdb           Started                                                                                                                                             0.4s 
+ ✔ Container dig4el_logic_ui  Started                                                                                                                                             0.5s 
+ ✔ Container nginx_proxy      Started                                                                                                                                             0.8s 
+ ✔ Container certbot          Started 
 ```
 
 Certificates are valid for ~90 days. A cron job can be set to automate the renewal
