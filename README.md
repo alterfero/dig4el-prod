@@ -80,8 +80,8 @@ Stop the Nginx container (freeing port 80) and run Certbot in standalone mode to
 ```
 sudo docker compose stop nginx
 sudo docker compose run --rm certbot certonly --standalone \
-    --agree-tos --no-eff-email --email sebastien.christian@doctorant.upf.pf \
-    -d dig4el.upf.pf -d www.dig4el.upf.pf
+    --agree-tos --no-eff-email --email sebastien.christian@doctorant.upf.pf -d dig4el.upf.pf
+    
 ```
 This writes certificates into the shared volume certbot_certs:/etc/letsencrypt/
 Then start Nginx again
