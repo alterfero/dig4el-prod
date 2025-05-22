@@ -3,13 +3,36 @@ import os
 from sqlalchemy.exc import IntegrityError
 from models import User, get_session
 from auth import hash_password, verify_password
+
+def _replicate_user(user: User) -> None:
+    """Insert the given user into the other databases if not present."""
+    for env_var in ("CQ_DATABASE_URL", "TRANSCRIPTION_DATABASE_URL", "LCQ_DATABASE_URL"):
+        db_url = os.environ.get(env_var)
+        if not db_url:
+            continue
+        session = get_session(db_url)
+        try:
+            # Try to add the user with the same ID so foreign keys match
+            replica = User(
+                id=user.id,
+                username=user.username,
+                email=user.email,
+                password_hash=user.password_hash,
+                is_guest=user.is_guest,
+            )
+            session.add(replica)
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+        finally:
+            session.close()
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import random
 import string
 
-def register_user(username: str, email: str, plain_password: str) -> bool:
+def register_user(username: str, email: str, plain_password: str) -> int | None:
     session = get_session(os.environ.get("AUTH_DATABASE_URL"))
     try:
         user = User(
@@ -19,24 +42,27 @@ def register_user(username: str, email: str, plain_password: str) -> bool:
         )
         session.add(user)
         session.commit()
-        return True
+        _replicate_user(user)
+        return user.id
     except IntegrityError:
         # Username or email might already be taken, or other constraint
         session.rollback()
-        return False
+        return None
     finally:
         session.close()
 
 
-def authenticate_user(username: str, plain_password: str) -> bool:
+def authenticate_user(username: str, plain_password: str) -> int | None:
     session = get_session(os.environ.get("AUTH_DATABASE_URL"))
     try:
         user = session.query(User).filter_by(username=username).first()
         if not user:
-            return False
+            return None
         if user.is_guest:
-            return True
-        return verify_password(user.password_hash, plain_password)
+            return user.id
+        if verify_password(user.password_hash, plain_password):
+            return user.id
+        return None
     finally:
         session.close()
 
@@ -92,7 +118,7 @@ def send_email(to_email: str, temp_password: str) -> None:
     except Exception as e:
         print(f"Failed to send email: {e}")
 
-def create_guest_user(username: str) -> bool:
+def create_guest_user(username: str) -> int | None:
     session = get_session(os.environ.get("AUTH_DATABASE_URL"))
     try:
         user = User(
@@ -103,9 +129,10 @@ def create_guest_user(username: str) -> bool:
         )
         session.add(user)
         session.commit()
-        return True
+        _replicate_user(user)
+        return user.id
     except IntegrityError:
         session.rollback()
-        return False
+        return None
     finally:
         session.close()
