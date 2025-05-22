@@ -2,6 +2,7 @@ import os
 
 from sqlalchemy.exc import IntegrityError
 from models import User, get_session
+from sqlalchemy import inspect
 from auth import hash_password, verify_password
 
 def _replicate_user(user: User) -> None:
@@ -12,14 +13,18 @@ def _replicate_user(user: User) -> None:
             continue
         session = get_session(db_url)
         try:
-            # Try to add the user with the same ID so foreign keys match
-            replica = User(
-                id=user.id,
-                username=user.username,
-                email=user.email,
-                password_hash=user.password_hash,
-                is_guest=user.is_guest,
-            )
+            insp = inspect(session.bind)
+            columns = {c['name'] for c in insp.get_columns('users')}
+            replica_data = {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'password_hash': user.password_hash,
+            }
+            if 'is_guest' in columns:
+                replica_data['is_guest'] = user.is_guest
+
+            replica = User(**replica_data)
             session.add(replica)
             session.commit()
         except IntegrityError:

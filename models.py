@@ -1,8 +1,18 @@
 import os
-from sqlalchemy import Column, Integer, String, JSON, DateTime, ForeignKey, Boolean, LargeBinary
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    JSON,
+    DateTime,
+    ForeignKey,
+    Boolean,
+    LargeBinary,
+    create_engine,
+    text,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from sqlalchemy import create_engine
 from datetime import datetime
 
 Base = declarative_base()
@@ -63,6 +73,20 @@ def init_db():
     Base.metadata.create_all(cq_engine)
     Base.metadata.create_all(transcription_engine)
     Base.metadata.create_all(lcq_engine)
+
+    # Ensure the users table has the is_guest column in all databases
+    for engine in (auth_engine, cq_engine, transcription_engine, lcq_engine):
+        with engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name='users' AND column_name='is_guest'
+                    """
+                )
+            )
+            if result.fetchone() is None:
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_guest BOOLEAN DEFAULT FALSE"))
 
 def get_session(db_url):
     engine = get_engine(db_url)
