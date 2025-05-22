@@ -9,7 +9,7 @@ from email.mime.multipart import MIMEMultipart
 import random
 import string
 
-def register_user(username: str, email: str, plain_password: str) -> bool:
+def register_user(username: str, email: str, plain_password: str) -> int | None:
     session = get_session(os.environ.get("AUTH_DATABASE_URL"))
     try:
         user = User(
@@ -19,24 +19,26 @@ def register_user(username: str, email: str, plain_password: str) -> bool:
         )
         session.add(user)
         session.commit()
-        return True
+        return user.id
     except IntegrityError:
         # Username or email might already be taken, or other constraint
         session.rollback()
-        return False
+        return None
     finally:
         session.close()
 
 
-def authenticate_user(username: str, plain_password: str) -> bool:
+def authenticate_user(username: str, plain_password: str) -> int | None:
     session = get_session(os.environ.get("AUTH_DATABASE_URL"))
     try:
         user = session.query(User).filter_by(username=username).first()
         if not user:
-            return False
+            return None
         if user.is_guest:
-            return True
-        return verify_password(user.password_hash, plain_password)
+            return user.id
+        if verify_password(user.password_hash, plain_password):
+            return user.id
+        return None
     finally:
         session.close()
 
@@ -92,7 +94,7 @@ def send_email(to_email: str, temp_password: str) -> None:
     except Exception as e:
         print(f"Failed to send email: {e}")
 
-def create_guest_user(username: str) -> bool:
+def create_guest_user(username: str) -> int | None:
     session = get_session(os.environ.get("AUTH_DATABASE_URL"))
     try:
         user = User(
@@ -103,9 +105,9 @@ def create_guest_user(username: str) -> bool:
         )
         session.add(user)
         session.commit()
-        return True
+        return user.id
     except IntegrityError:
         session.rollback()
-        return False
+        return None
     finally:
         session.close()

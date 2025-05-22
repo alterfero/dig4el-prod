@@ -32,6 +32,7 @@ def main():
         if st.button("Logout"):
             st.session_state.logged_in = False
             st.session_state.username = ""
+            st.session_state.user_id = None
             st.session_state.is_guest = False
             st.rerun()
 
@@ -178,9 +179,9 @@ def main():
         new_password = st.text_input("Password", type="password", key="register_password")
         if st.button("Register"):
             if new_username and new_email and new_password:
-                success = register_user(new_username, new_email, new_password)
-                if success:
-                    st.success("User registered successfully!")
+                user_id = register_user(new_username, new_email, new_password)
+                if user_id is not None:
+                    st.success(f"User registered successfully! Your user ID is {user_id}")
                 else:
                     st.error("Registration failed (maybe username already taken).")
             else:
@@ -192,10 +193,11 @@ def main():
         login_password = st.text_input("Password", type="password", key="login_password")
         if st.button("Login"):
             if login_username and login_password:
-                is_authenticated = authenticate_user(login_username, login_password)
-                if is_authenticated:
+                user_id = authenticate_user(login_username, login_password)
+                if user_id is not None:
                     st.session_state.logged_in = True
                     st.session_state.username = login_username
+                    st.session_state.user_id = user_id
 
                     st.success("Login successful!")
                     st.rerun()
@@ -207,12 +209,16 @@ def main():
         # Login as Guest
         if st.button("Login as Guest"):
             guest_username = "guest_" + ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-            st.session_state.logged_in = True
-            st.session_state.username = guest_username
-            st.session_state.is_guest = True
-            create_guest_user(guest_username)
-            st.success("Logged in as Guest!")
-            st.rerun()
+            user_id = create_guest_user(guest_username)
+            if user_id is not None:
+                st.session_state.logged_in = True
+                st.session_state.username = guest_username
+                st.session_state.user_id = user_id
+                st.session_state.is_guest = True
+                st.success("Logged in as Guest!")
+                st.rerun()
+            else:
+                st.error("Failed to create guest user.")
 
         # Forgot Password
         st.header("Forgot Password")
