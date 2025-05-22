@@ -101,56 +101,95 @@ def main():
             ],
         )
 
-        if st.button("Upload"):
-            if uploaded_file and upload_access_authorization:
-                if upload_type == "Legacy CQ":
-                    session = get_session(os.environ["LCQ_DATABASE_URL"])
-                    new_lcq = LegacyCQ(
-                        filename=uploaded_file.name,
-                        file_data=uploaded_file.read(),
-                        author_id=st.session_state.user_id,
-                        access_authorization=upload_access_authorization,
-                    )
-                    session.add(new_lcq)
-                    session.commit()
-                    session.close()
-                    st.success("Legacy CQ uploaded successfully!")
+        if upload_type == "Transcription" and uploaded_file:
+            try:
+                json_text = uploaded_file.getvalue().decode("utf-8")
+                json_data = json.loads(json_text)
+            except Exception:
+                st.error("Invalid JSON file.")
+                json_data = None
+            if json_data:
+                session = get_session(os.environ["CQ_DATABASE_URL"])
+                cq_match = session.query(CQ).filter(CQ.uid == json_data.get("cq_uid")).first()
+                session.close()
+                if cq_match:
+                    cq_title = cq_match.json_data.get("title", "Unknown title")
+                    confirm_cq = st.radio(f"CQ used: {cq_title}", ["yes", "no"], index=0)
                 else:
-                    if upload_version:
-                        try:
-                            json_text = uploaded_file.read().decode("utf-8")
-                            json_data = json.loads(json_text)
-                        except Exception:
-                            st.error("Invalid JSON file.")
-                        else:
-                            if upload_type == "CQ":
-                                session = get_session(os.environ["CQ_DATABASE_URL"])
-                                new_cq = CQ(
-                                    json_data=json_data,
-                                    author_id=st.session_state.user_id,
-                                    version=upload_version,
-                                    access_authorization=upload_access_authorization,
-                                )
-                                session.add(new_cq)
-                                session.commit()
-                                session.close()
-                                st.success("CQ data uploaded successfully!")
-                            elif upload_type == "Transcription":
-                                session = get_session(os.environ["TRANSCRIPTION_DATABASE_URL"])
-                                new_transcription = Transcription(
-                                    json_data=json_data,
-                                    author_id=st.session_state.user_id,
-                                    version=upload_version,
-                                    access_authorization=upload_access_authorization,
-                                )
-                                session.add(new_transcription)
-                                session.commit()
-                                session.close()
-                                st.success("Transcription data uploaded successfully!")
-                    else:
+                    st.warning("There is no CQ corresponding to this transcription")
+                    confirm_cq = None
+
+                pivot_language = st.text_input("Pivot language", value=json_data.get("pivot language", ""))
+                target_language = st.text_input("Target language", value=json_data.get("target language", ""))
+                interviewer = st.text_input("Interviewer name", value=json_data.get("interviewer", ""))
+                consultant = st.text_input("Consultant name", value=json_data.get("consultant", ""))
+                consultant_auth = st.checkbox("I have authorization from the consultant to upload this transcription")
+
+                if st.button("Upload"):
+                    if cq_match is None:
+                        st.error("There is no CQ corresponding to this transcription")
+                    elif confirm_cq == "no":
+                        st.error("There is a CQ-Transcription mismatch")
+                    elif not consultant_auth:
+                        st.error("Please confirm you have the consultant's authorization")
+                    elif not upload_version:
                         st.error("Please enter a version.")
-            else:
-                st.error("Please select a file and authorization.")
+                    else:
+                        json_data["pivot language"] = pivot_language
+                        json_data["target language"] = target_language
+                        json_data["interviewer"] = interviewer
+                        json_data["consultant"] = consultant
+                        session = get_session(os.environ["TRANSCRIPTION_DATABASE_URL"])
+                        new_transcription = Transcription(
+                            json_data=json_data,
+                            author_id=st.session_state.user_id,
+                            version=upload_version,
+                            access_authorization=upload_access_authorization,
+                        )
+                        session.add(new_transcription)
+                        session.commit()
+                        session.close()
+                        st.success("Transcription data uploaded successfully!")
+        else:
+            if st.button("Upload"):
+                if uploaded_file and upload_access_authorization:
+                    if upload_type == "Legacy CQ":
+                        session = get_session(os.environ["LCQ_DATABASE_URL"])
+                        new_lcq = LegacyCQ(
+                            filename=uploaded_file.name,
+                            file_data=uploaded_file.read(),
+                            author_id=st.session_state.user_id,
+                            access_authorization=upload_access_authorization,
+                        )
+                        session.add(new_lcq)
+                        session.commit()
+                        session.close()
+                        st.success("Legacy CQ uploaded successfully!")
+                    else:
+                        if upload_version:
+                            try:
+                                json_text = uploaded_file.read().decode("utf-8")
+                                json_data = json.loads(json_text)
+                            except Exception:
+                                st.error("Invalid JSON file.")
+                            else:
+                                if upload_type == "CQ":
+                                    session = get_session(os.environ["CQ_DATABASE_URL"])
+                                    new_cq = CQ(
+                                        uid=json_data.get("uid"),
+                                        json_data=json_data,
+                                        author_id=st.session_state.user_id,
+                                        version=upload_version,
+                                        access_authorization=upload_access_authorization,
+                                    )
+                                    session.add(new_cq)
+                                    session.commit()
+                                    session.close()
+                                    st.success("CQ data uploaded successfully!")
+                        else:
+                            st.error("Please enter a version.")
+                else:
+                    st.error("Please select a file and authorization.")
 
         # Change Password
         if not st.session_state.is_guest:
