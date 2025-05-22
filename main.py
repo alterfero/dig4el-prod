@@ -1,7 +1,9 @@
 import os
 
 import streamlit as st
-from models import init_db, get_session, CQ, Transcription
+import random
+import string
+from models import init_db, get_session, CQ, Transcription, LegacyCQ
 from user_service import register_user, authenticate_user, reset_password, change_password, create_guest_user
 from sqlalchemy.orm import sessionmaker
 
@@ -50,6 +52,14 @@ def main():
         ).all()
         session.close()
 
+        session = get_session(os.environ["LCQ_DATABASE_URL"])
+        lcq_data = session.query(LegacyCQ).filter(
+            (LegacyCQ.author_id == st.session_state.user_id) |
+            (LegacyCQ.access_authorization == "Can be read by other registered users") |
+            (LegacyCQ.access_authorization == "Can be read by unregistered guests")
+        ).all()
+        session.close()
+
         st.subheader("CQ Data")
         for cq in cq_data:
             st.json(cq.json_data)
@@ -58,41 +68,72 @@ def main():
         for transcription in transcription_data:
             st.json(transcription.json_data)
 
+        st.subheader("Legacy CQ Data")
+        for lcq in lcq_data:
+            st.download_button(
+                label=f"Download {lcq.filename}",
+                data=lcq.file_data,
+                file_name=lcq.filename,
+                mime="application/octet-stream"
+            )
+
         # Upload Section
-        st.header("Upload CQ or Transcription")
-        upload_type = st.selectbox("Select Upload Type", ["CQ", "Transcription"])
-        upload_json_data = st.text_area("JSON Data")
-        upload_version = st.text_input("Version")
+        st.header("Upload CQ, Transcription or Legacy CQ")
+        upload_type = st.selectbox("Select Upload Type", ["CQ", "Transcription", "Legacy CQ"])
+        upload_json_data = ""
+        upload_version = ""
+        uploaded_file = None
+        if upload_type == "Legacy CQ":
+            uploaded_file = st.file_uploader("Legacy CQ File")
+        else:
+            upload_json_data = st.text_area("JSON Data")
+            upload_version = st.text_input("Version")
         upload_access_authorization = st.selectbox("Access Authorization", ["No sharing", "Can be read by other registered users", "Can be read by unregistered guests"])
 
         if st.button("Upload"):
-            if upload_json_data and upload_version and upload_access_authorization:
-                if upload_type == "CQ":
-                    session = get_session(os.environ["CQ_DATABASE_URL"])
-                    new_cq = CQ(
-                        json_data=upload_json_data,
+            if upload_type == "Legacy CQ":
+                if uploaded_file and upload_access_authorization:
+                    session = get_session(os.environ["LCQ_DATABASE_URL"])
+                    new_lcq = LegacyCQ(
+                        filename=uploaded_file.name,
+                        file_data=uploaded_file.read(),
                         author_id=st.session_state.user_id,
-                        version=upload_version,
                         access_authorization=upload_access_authorization
                     )
-                    session.add(new_cq)
+                    session.add(new_lcq)
                     session.commit()
                     session.close()
-                    st.success("CQ data uploaded successfully!")
-                elif upload_type == "Transcription":
-                    session = get_session(os.environ["TRANSCRIPTION_DATABASE_URL"])
-                    new_transcription = Transcription(
-                        json_data=upload_json_data,
-                        author_id=st.session_state.user_id,
-                        version=upload_version,
-                        access_authorization=upload_access_authorization
-                    )
-                    session.add(new_transcription)
-                    session.commit()
-                    session.close()
-                    st.success("Transcription data uploaded successfully!")
+                    st.success("Legacy CQ uploaded successfully!")
+                else:
+                    st.error("Please select a file and authorization.")
             else:
-                st.error("Please enter all fields.")
+                if upload_json_data and upload_version and upload_access_authorization:
+                    if upload_type == "CQ":
+                        session = get_session(os.environ["CQ_DATABASE_URL"])
+                        new_cq = CQ(
+                            json_data=upload_json_data,
+                            author_id=st.session_state.user_id,
+                            version=upload_version,
+                            access_authorization=upload_access_authorization
+                        )
+                        session.add(new_cq)
+                        session.commit()
+                        session.close()
+                        st.success("CQ data uploaded successfully!")
+                    elif upload_type == "Transcription":
+                        session = get_session(os.environ["TRANSCRIPTION_DATABASE_URL"])
+                        new_transcription = Transcription(
+                            json_data=upload_json_data,
+                            author_id=st.session_state.user_id,
+                            version=upload_version,
+                            access_authorization=upload_access_authorization
+                        )
+                        session.add(new_transcription)
+                        session.commit()
+                        session.close()
+                        st.success("Transcription data uploaded successfully!")
+                else:
+                    st.error("Please enter all fields.")
 
         # Change Password
         if not st.session_state.is_guest:
