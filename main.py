@@ -18,6 +18,7 @@ def main():
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
         st.session_state.username = ""
+        st.session_state.user_id = None
         st.session_state.is_guest = False
 
     if st.session_state.logged_in:
@@ -35,7 +36,7 @@ def main():
         st.header("Dashboard")
         session = get_session(os.environ["CQ_DATABASE_URL"])
         cq_data = session.query(CQ).filter(
-            (CQ.author_id == st.session_state.username) |
+            (CQ.author_id == st.session_state.user_id) |
             (CQ.access_authorization == "Can be read by other registered users") |
             (CQ.access_authorization == "Can be read by unregistered guests")
         ).all()
@@ -43,7 +44,7 @@ def main():
 
         session = get_session(os.environ["TRANSCRIPTION_DATABASE_URL"])
         transcription_data = session.query(Transcription).filter(
-            (Transcription.author_id == st.session_state.username) |
+            (Transcription.author_id == st.session_state.user_id) |
             (Transcription.access_authorization == "Can be read by other registered users") |
             (Transcription.access_authorization == "Can be read by unregistered guests")
         ).all()
@@ -138,6 +139,7 @@ def main():
                 if is_authenticated:
                     st.session_state.logged_in = True
                     st.session_state.username = login_username
+
                     st.success("Login successful!")
                     st.rerun()
                 else:
