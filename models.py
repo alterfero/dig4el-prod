@@ -28,6 +28,7 @@ class User(Base):
 class CQ(Base):
     __tablename__ = "cq"
     id = Column(Integer, primary_key=True, autoincrement=True)
+    uid = Column(String(255), unique=True)
     json_data = Column(JSON, nullable=False)
     author_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     version = Column(String(50), nullable=False)
@@ -73,6 +74,19 @@ def init_db():
     Base.metadata.create_all(cq_engine)
     Base.metadata.create_all(transcription_engine)
     Base.metadata.create_all(lcq_engine)
+
+    # Ensure the cq table has the uid column
+    with cq_engine.begin() as conn:
+        result = conn.execute(
+            text(
+                """
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='cq' AND column_name='uid'
+                """
+            )
+        )
+        if result.fetchone() is None:
+            conn.execute(text("ALTER TABLE cq ADD COLUMN uid VARCHAR(255)"))
 
     # Ensure the users table has the is_guest column in all databases
     for engine in (auth_engine, cq_engine, transcription_engine, lcq_engine):
