@@ -64,8 +64,10 @@ def authenticate_user(username: str, plain_password: str) -> int | None:
         if not user:
             return None
         if user.is_guest:
+            _replicate_user(user)
             return user.id
         if verify_password(user.password_hash, plain_password):
+            _replicate_user(user)
             return user.id
         return None
     finally:
