@@ -51,6 +51,7 @@ POSTGRES_DB=auth_db
 DATABASE_URL=postgresql://your_admin_username:your_password@db:5432/auth_db
 CQ_DATABASE_URL=postgresql://your_admin_username:your_password@cq_db:5433/cq_db
 TRANSCRIPTION_DATABASE_URL=postgresql://your_admin_username:your_password@transcription_db:5434/transcription_db
+LCQ_DATABASE_URL=postgresql://your_admin_username:your_password@lcq_db:5435/lcq_db
 SECRET_KEY=any_needed_secret_key
 ```
 Never commit this file, it keeps your secrets secret. Add it to `.gitignore`
@@ -133,3 +134,6 @@ A separate section on the 'dashboard' page invites the user to upload a CQ or a 
 
 ### Guest Login
 The login page now includes a "Login as Guest" button. Guests don't need to register (no username, email, or password needed). They can use the software but are restricted in their actions (they can't upload anything, or read content reserved to registered users).
+
+### Legacy CQ Uploads
+Logged in users can also upload and download legacy CQ documents (Word, Excel, PDF...). These files are stored in a dedicated database.

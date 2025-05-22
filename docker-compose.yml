@@ -32,17 +32,29 @@ services:
       - transcription_db_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  lcq_db:
+    image: postgres:17
+    container_name: lcq_db
+    env_file:
+      - .env
+    ports:
+      - "5435:5432"
+    volumes:
+      - lcq_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: dig4el_logic_ui
-    env_file:
-      - .env
-    depends_on:
-      - db
-      - cq_db
-      - transcription_db
+      container_name: dig4el_logic_ui
+      env_file:
+        - .env
+      depends_on:
+        - db
+        - cq_db
+        - transcription_db
+        - lcq_db
     expose:
       - "8501"  # internal Docker network port
     command: >
@@ -67,11 +79,12 @@ services:
     container_name: certbot
     ports:
       - "80:80"
-    volumes:
-      - /etc/letsencrypt:/etc/letsencrypt
+  volumes:
+    - /etc/letsencrypt:/etc/letsencrypt
 
 volumes:
   db_data:
   cq_db_data:
   transcription_db_data:
+  lcq_db_data:
   certbot_certs:
