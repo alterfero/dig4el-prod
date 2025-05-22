@@ -49,6 +49,8 @@ POSTGRES_USER=your_admin_username
 POSTGRES_PASSWORD=your_password
 POSTGRES_DB=auth_db
 DATABASE_URL=postgresql://your_admin_username:your_password@db:5432/auth_db
+CQ_DATABASE_URL=postgresql://your_admin_username:your_password@cq_db:5433/cq_db
+TRANSCRIPTION_DATABASE_URL=postgresql://your_admin_username:your_password@transcription_db:5434/transcription_db
 SECRET_KEY=any_needed_secret_key
 ```
 Never commit this file, it keeps your secrets secret. Add it to `.gitignore`

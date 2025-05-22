@@ -10,6 +10,28 @@ services:
       - db_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  cq_db:
+    image: postgres:17
+    container_name: cq_db
+    env_file:
+      - .env
+    ports:
+      - "5433:5432"
+    volumes:
+      - cq_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  transcription_db:
+    image: postgres:17
+    container_name: transcription_db
+    env_file:
+      - .env
+    ports:
+      - "5434:5432"
+    volumes:
+      - transcription_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   app:
     build:
       context: .
@@ -19,6 +41,8 @@ services:
       - .env
     depends_on:
       - db
+      - cq_db
+      - transcription_db
     expose:
       - "8501"  # internal Docker network port
     command: >
@@ -48,4 +72,6 @@ services:
 
 volumes:
   db_data:
+  cq_db_data:
+  transcription_db_data:
   certbot_certs:

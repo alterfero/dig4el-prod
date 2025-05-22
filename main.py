@@ -1,6 +1,7 @@
 import streamlit as st
-from models import init_db
+from models import init_db, get_session, CQ, Transcription
 from user_service import register_user, authenticate_user, reset_password, change_password
+from sqlalchemy.orm import sessionmaker
 
 st.set_page_config(
     page_title="DIG4EL",
@@ -10,7 +11,7 @@ st.set_page_config(
 )
 
 def main():
-    init_db()  # Initialize the database
+    init_db()  # Initialize the databases
 
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
@@ -39,6 +40,49 @@ def main():
                     st.error("Failed to change password. Please check your current password.")
             else:
                 st.error("Please enter your current password and new password.")
+
+        # CQ Database Operations
+        st.header("CQ Database Operations")
+        cq_json_data = st.text_area("CQ JSON Data")
+        cq_version = st.text_input("CQ Version")
+        cq_access_authorization = st.text_input("CQ Access Authorization")
+        if st.button("Add CQ Data"):
+            if cq_json_data and cq_version and cq_access_authorization:
+                session = get_session("CQ_DATABASE_URL")
+                new_cq = CQ(
+                    json_data=cq_json_data,
+                    author_id=st.session_state.user_id,
+                    version=cq_version,
+                    access_authorization=cq_access_authorization
+                )
+                session.add(new_cq)
+                session.commit()
+                session.close()
+                st.success("CQ data added successfully!")
+            else:
+                st.error("Please enter all CQ data fields.")
+
+        # Transcription Database Operations
+        st.header("Transcription Database Operations")
+        transcription_json_data = st.text_area("Transcription JSON Data")
+        transcription_version = st.text_input("Transcription Version")
+        transcription_access_authorization = st.text_input("Transcription Access Authorization")
+        if st.button("Add Transcription Data"):
+            if transcription_json_data and transcription_version and transcription_access_authorization:
+                session = get_session("TRANSCRIPTION_DATABASE_URL")
+                new_transcription = Transcription(
+                    json_data=transcription_json_data,
+                    author_id=st.session_state.user_id,
+                    version=transcription_version,
+                    access_authorization=transcription_access_authorization
+                )
+                session.add(new_transcription)
+                session.commit()
+                session.close()
+                st.success("Transcription data added successfully!")
+            else:
+                st.error("Please enter all Transcription data fields.")
+
     else:
         st.header("DIG4EL")
         st.markdown("### Digital Inferential Grammars for Endangered Languages")

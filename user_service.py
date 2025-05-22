@@ -10,9 +10,8 @@ from email.mime.multipart import MIMEMultipart
 import random
 import string
 
-
 def register_user(username: str, email: str, plain_password: str) -> bool:
-    session = get_session()
+    session = get_session(os.environ.get("AUTH_DATABASE_URL"))
     try:
         user = User(
             username=username,
@@ -31,7 +30,7 @@ def register_user(username: str, email: str, plain_password: str) -> bool:
 
 
 def authenticate_user(username: str, plain_password: str) -> bool:
-    session = get_session()
+    session = get_session(os.environ.get("AUTH_DATABASE_URL"))
     try:
         user = session.query(User).filter_by(username=username).first()
         if not user:
@@ -42,7 +41,7 @@ def authenticate_user(username: str, plain_password: str) -> bool:
 
 
 def reset_password(email: str) -> None:
-    session = get_session()
+    session = get_session(os.environ.get("AUTH_DATABASE_URL"))
     try:
         user = session.query(User).filter_by(email=email).first()
         if user:
@@ -58,7 +57,7 @@ def reset_password(email: str) -> None:
 
 
 def change_password(username: str, current_password: str, new_password: str) -> bool:
-    session = get_session()
+    session = get_session(os.environ.get("AUTH_DATABASE_URL"))
     try:
         user = session.query(User).filter_by(username=username).first()
         if user and verify_password(user.password_hash, current_password):
