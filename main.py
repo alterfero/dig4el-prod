@@ -1,6 +1,8 @@
+import os
+
 import streamlit as st
 from models import init_db, get_session, CQ, Transcription
-from user_service import register_user, authenticate_user, reset_password, change_password
+from user_service import register_user, authenticate_user, reset_password, change_password, create_guest_user
 from sqlalchemy.orm import sessionmaker
 
 st.set_page_config(
@@ -16,6 +18,7 @@ def main():
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
         st.session_state.username = ""
+        st.session_state.is_guest = False
 
     if st.session_state.logged_in:
         st.header(f"Welcome, {st.session_state.username}!")
@@ -25,63 +28,85 @@ def main():
         if st.button("Logout"):
             st.session_state.logged_in = False
             st.session_state.username = ""
+            st.session_state.is_guest = False
             st.rerun()
 
+        # Dashboard
+        st.header("Dashboard")
+        session = get_session(os.environ["CQ_DATABASE_URL"])
+        cq_data = session.query(CQ).filter(
+            (CQ.author_id == st.session_state.username) |
+            (CQ.access_authorization == "Can be read by other registered users") |
+            (CQ.access_authorization == "Can be read by unregistered guests")
+        ).all()
+        session.close()
+
+        session = get_session(os.environ["TRANSCRIPTION_DATABASE_URL"])
+        transcription_data = session.query(Transcription).filter(
+            (Transcription.author_id == st.session_state.username) |
+            (Transcription.access_authorization == "Can be read by other registered users") |
+            (Transcription.access_authorization == "Can be read by unregistered guests")
+        ).all()
+        session.close()
+
+        st.subheader("CQ Data")
+        for cq in cq_data:
+            st.json(cq.json_data)
+
+        st.subheader("Transcription Data")
+        for transcription in transcription_data:
+            st.json(transcription.json_data)
+
+        # Upload Section
+        st.header("Upload CQ or Transcription")
+        upload_type = st.selectbox("Select Upload Type", ["CQ", "Transcription"])
+        upload_json_data = st.text_area("JSON Data")
+        upload_version = st.text_input("Version")
+        upload_access_authorization = st.selectbox("Access Authorization", ["No sharing", "Can be read by other registered users", "Can be read by unregistered guests"])
+
+        if st.button("Upload"):
+            if upload_json_data and upload_version and upload_access_authorization:
+                if upload_type == "CQ":
+                    session = get_session(os.environ["CQ_DATABASE_URL"])
+                    new_cq = CQ(
+                        json_data=upload_json_data,
+                        author_id=st.session_state.user_id,
+                        version=upload_version,
+                        access_authorization=upload_access_authorization
+                    )
+                    session.add(new_cq)
+                    session.commit()
+                    session.close()
+                    st.success("CQ data uploaded successfully!")
+                elif upload_type == "Transcription":
+                    session = get_session(os.environ["TRANSCRIPTION_DATABASE_URL"])
+                    new_transcription = Transcription(
+                        json_data=upload_json_data,
+                        author_id=st.session_state.user_id,
+                        version=upload_version,
+                        access_authorization=upload_access_authorization
+                    )
+                    session.add(new_transcription)
+                    session.commit()
+                    session.close()
+                    st.success("Transcription data uploaded successfully!")
+            else:
+                st.error("Please enter all fields.")
+
         # Change Password
-        st.header("Change Password")
-        current_password = st.text_input("Current Password", type="password", key="current_password")
-        new_password = st.text_input("New Password", type="password", key="new_password")
-        if st.button("Change Password"):
-            if current_password and new_password:
-                success = change_password(st.session_state.username, current_password, new_password)
-                if success:
-                    st.success("Password changed successfully!")
+        if not st.session_state.is_guest:
+            st.header("Change Password")
+            current_password = st.text_input("Current Password", type="password", key="current_password")
+            new_password = st.text_input("New Password", type="password", key="new_password")
+            if st.button("Change Password"):
+                if current_password and new_password:
+                    success = change_password(st.session_state.username, current_password, new_password)
+                    if success:
+                        st.success("Password changed successfully!")
+                    else:
+                        st.error("Failed to change password. Please check your current password.")
                 else:
-                    st.error("Failed to change password. Please check your current password.")
-            else:
-                st.error("Please enter your current password and new password.")
-
-        # CQ Database Operations
-        st.header("CQ Database Operations")
-        cq_json_data = st.text_area("CQ JSON Data")
-        cq_version = st.text_input("CQ Version")
-        cq_access_authorization = st.text_input("CQ Access Authorization")
-        if st.button("Add CQ Data"):
-            if cq_json_data and cq_version and cq_access_authorization:
-                session = get_session("CQ_DATABASE_URL")
-                new_cq = CQ(
-                    json_data=cq_json_data,
-                    author_id=st.session_state.user_id,
-                    version=cq_version,
-                    access_authorization=cq_access_authorization
-                )
-                session.add(new_cq)
-                session.commit()
-                session.close()
-                st.success("CQ data added successfully!")
-            else:
-                st.error("Please enter all CQ data fields.")
-
-        # Transcription Database Operations
-        st.header("Transcription Database Operations")
-        transcription_json_data = st.text_area("Transcription JSON Data")
-        transcription_version = st.text_input("Transcription Version")
-        transcription_access_authorization = st.text_input("Transcription Access Authorization")
-        if st.button("Add Transcription Data"):
-            if transcription_json_data and transcription_version and transcription_access_authorization:
-                session = get_session("TRANSCRIPTION_DATABASE_URL")
-                new_transcription = Transcription(
-                    json_data=transcription_json_data,
-                    author_id=st.session_state.user_id,
-                    version=transcription_version,
-                    access_authorization=transcription_access_authorization
-                )
-                session.add(new_transcription)
-                session.commit()
-                session.close()
-                st.success("Transcription data added successfully!")
-            else:
-                st.error("Please enter all Transcription data fields.")
+                    st.error("Please enter your current password and new password.")
 
     else:
         st.header("DIG4EL")
@@ -119,6 +144,16 @@ def main():
                     st.error("Invalid username or password.")
             else:
                 st.error("Please enter a username and password.")
+
+        # Login as Guest
+        if st.button("Login as Guest"):
+            guest_username = "guest_" + ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+            st.session_state.logged_in = True
+            st.session_state.username = guest_username
+            st.session_state.is_guest = True
+            create_guest_user(guest_username)
+            st.success("Logged in as Guest!")
+            st.rerun()
 
         # Forgot Password
         st.header("Forgot Password")

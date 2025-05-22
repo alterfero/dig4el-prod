@@ -1,4 +1,3 @@
-# user_service.py
 import os
 
 from sqlalchemy.exc import IntegrityError
@@ -35,6 +34,8 @@ def authenticate_user(username: str, plain_password: str) -> bool:
         user = session.query(User).filter_by(username=username).first()
         if not user:
             return False
+        if user.is_guest:
+            return True
         return verify_password(user.password_hash, plain_password)
     finally:
         session.close()
@@ -90,3 +91,21 @@ def send_email(to_email: str, temp_password: str) -> None:
         server.quit()
     except Exception as e:
         print(f"Failed to send email: {e}")
+
+def create_guest_user(username: str) -> bool:
+    session = get_session(os.environ.get("AUTH_DATABASE_URL"))
+    try:
+        user = User(
+            username=username,
+            email="",
+            password_hash="",
+            is_guest=True
+        )
+        session.add(user)
+        session.commit()
+        return True
+    except IntegrityError:
+        session.rollback()
+        return False
+    finally:
+        session.close()

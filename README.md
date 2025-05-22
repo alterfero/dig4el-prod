@@ -122,3 +122,14 @@ You can check the log with
 ```
 docker compose logs -f
 ```
+
+## New Features
+
+### Dashboard Page
+Once a user is logged in, they will be directed to a new page called 'dashboard'. On this page, users can see all the CQ from cq_db and transcriptions from transcription_db they have access to. This includes the CQ and documents they are the authors of, and the CQ and transcriptions uploaded by others with a "read-only by other registered users" authorization.
+
+### Upload Section
+A separate section on the 'dashboard' page invites the user to upload a CQ or a transcription. When uploading a CQ, the user can choose a sharing authorization among: "No sharing", "Can be read by other registered users", "Can be read by unregistered guests".
+
+### Guest Login
+The login page now includes a "Login as Guest" button. Guests don't need to register (no username, email, or password needed). They can use the software but are restricted in their actions (they can't upload anything, or read content reserved to registered users).
