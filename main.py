@@ -6,7 +6,14 @@ import streamlit as st
 import random
 import string
 from models import init_db, get_session, CQ, Transcription, LegacyCQ
-from user_service import register_user, authenticate_user, reset_password, change_password, create_guest_user
+from user_service import (
+    register_user,
+    authenticate_user,
+    reset_password,
+    change_password,
+    create_guest_user,
+    verify_orcid,
+)
 from sqlalchemy.orm import sessionmaker
 
 st.set_page_config(
@@ -307,18 +314,28 @@ def main():
                 and new_orcid
                 and certify
             ):
-                user_id = register_user(
-                    new_username,
-                    new_email,
-                    new_password,
-                    new_first_name,
-                    new_last_name,
-                    new_orcid,
-                )
-                if user_id is not None:
-                    st.success(f"User registered successfully! Your user ID is {user_id}")
+                if verify_orcid(new_orcid, new_first_name, new_last_name):
+                    st.success("ORCID successfully verified")
+                    user_id = register_user(
+                        new_username,
+                        new_email,
+                        new_password,
+                        new_first_name,
+                        new_last_name,
+                        new_orcid,
+                    )
+                    if user_id is not None:
+                        st.success(
+                            f"User registered successfully! Your user ID is {user_id}"
+                        )
+                    else:
+                        st.error(
+                            "Registration failed (maybe username already taken)."
+                        )
                 else:
-                    st.error("Registration failed (maybe username already taken).")
+                    st.error(
+                        "ORCID not matching the first and last name provided, please verify your information"
+                    )
             else:
                 st.error("Please fill all fields and certify the information.")
 

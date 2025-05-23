@@ -1,9 +1,11 @@
 import os
+from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 from models import User, get_session
 from sqlalchemy import inspect
 from auth import hash_password, verify_password
+import requests
 
 def _replicate_user(user: User) -> None:
     """Insert the given user into the other databases if not present."""
@@ -42,6 +44,26 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import random
 import string
+
+def verify_orcid(orcid_id: str, first_name: str, last_name: str) -> bool:
+    """Validate that the ORCID exists and matches the given names."""
+    url = f"https://pub.orcid.org/v3.0/{orcid_id}/person"
+    headers = {"Accept": "application/json"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            return False
+        data: Any = resp.json()
+    except Exception:
+        return False
+
+    name_data = data.get("name", {}) if isinstance(data, dict) else {}
+    given = (name_data.get("given-names") or {}).get("value", "")
+    family = (name_data.get("family-name") or {}).get("value", "")
+    return (
+        given.strip().lower() == first_name.strip().lower()
+        and family.strip().lower() == last_name.strip().lower()
+    )
 
 def register_user(
     username: str,
