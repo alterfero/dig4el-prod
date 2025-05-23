@@ -292,16 +292,35 @@ def main():
         st.header("Register")
         new_username = st.text_input("Username", key="register_username")
         new_email = st.text_input("Email", key="register_email")
+        new_first_name = st.text_input("First Name", key="register_first_name")
+        new_last_name = st.text_input("Last Name", key="register_last_name")
+        new_orcid = st.text_input("ORCID", key="register_orcid")
         new_password = st.text_input("Password", type="password", key="register_password")
+        certify = st.checkbox("I certify that these information are correct", key="register_certify")
         if st.button("Register"):
-            if new_username and new_email and new_password:
-                user_id = register_user(new_username, new_email, new_password)
+            if (
+                new_username
+                and new_email
+                and new_password
+                and new_first_name
+                and new_last_name
+                and new_orcid
+                and certify
+            ):
+                user_id = register_user(
+                    new_username,
+                    new_email,
+                    new_password,
+                    new_first_name,
+                    new_last_name,
+                    new_orcid,
+                )
                 if user_id is not None:
                     st.success(f"User registered successfully! Your user ID is {user_id}")
                 else:
                     st.error("Registration failed (maybe username already taken).")
             else:
-                st.error("Please enter a username, email, and password.")
+                st.error("Please fill all fields and certify the information.")
 
         # Forgot Password
         st.header("Forgot Password")
