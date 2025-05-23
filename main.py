@@ -1,6 +1,7 @@
 import os
 import json
 
+import pandas as pd
 import streamlit as st
 import random
 import string
@@ -17,7 +18,7 @@ st.set_page_config(
 
 def main():
     init_db()  # Initialize the databases
-
+    st.sidebar.image("./images/dig4el_pottery.png")
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
         st.session_state.username = ""
@@ -25,11 +26,9 @@ def main():
         st.session_state.is_guest = False
 
     if st.session_state.logged_in:
-        st.header(f"Welcome, {st.session_state.username}!")
-        st.markdown("### Digital Inferential Grammars for Endangered Languages")
-        st.markdown('*Site in construction*')
+        st.sidebar.markdown(f"**{st.session_state.username}**'s Dashboard")
 
-        if st.button("Logout"):
+        if st.sidebar.button("Logout"):
             st.session_state.logged_in = False
             st.session_state.username = ""
             st.session_state.user_id = None
@@ -37,7 +36,7 @@ def main():
             st.rerun()
 
         # Dashboard
-        st.header("Dashboard")
+
         session = get_session(os.environ["CQ_DATABASE_URL"])
         cq_data = session.query(CQ).filter(
             (CQ.author_id == st.session_state.user_id) |
@@ -62,22 +61,45 @@ def main():
         ).all()
         session.close()
 
-        st.subheader("CQ Data")
+        st.subheader("Conversational Questionnaires")
+        cq_data_list = []
         for cq in cq_data:
-            st.json(cq.json_data)
-
-        st.subheader("Transcription Data")
-        for transcription in transcription_data:
-            st.json(transcription.json_data)
-
-        st.subheader("Legacy CQ Data")
-        for lcq in lcq_data:
-            st.download_button(
-                label=f"Download {lcq.filename}",
-                data=lcq.file_data,
-                file_name=lcq.filename,
-                mime="application/octet-stream"
+            cq_data_list.append({
+                "title": cq.json_data.get("title", "no title"),
+                "author": cq.author_id,
+                "last update": cq.last_update_date,
+                "access": cq.access_authorization
+            }
             )
+        st.dataframe(pd.DataFrame(cq_data_list))
+
+        st.subheader("Transcriptions")
+        transcription_data_list = []
+        for transcription in transcription_data:
+            transcription_data_list.append(
+                {
+                    "Guardian": transcription.author_id,
+                    "Consultant": transcription.json_data.get("interviewee", "unknown"),
+                    "Interviewer": transcription.json_data.get("interviewer", "unknown"),
+                    "last update": transcription.last_update_date,
+                    "access": transcription.access_authorization
+                }
+
+            )
+        st.dataframe(pd.DataFrame(transcription_data_list))
+
+        st.subheader("ConQuest: Legacy Conversational Questionnaires")
+        lcq_data_list = []
+        for lcq in lcq_data:
+            lcq_data_list.append(
+                {
+                    "filename": lcq.filename,
+                    "author": lcq.author_id,
+                    "last update": lcq.last_update_date,
+                    "access": lcq.access_authorization
+                }
+            )
+        st.dataframe(pd.DataFrame(lcq_data_list))
 
         # Upload Section
         st.header("Upload CQ, Transcription or Legacy CQ")
@@ -196,18 +218,19 @@ def main():
 
         # Change Password
         if not st.session_state.is_guest:
-            st.header("Change Password")
-            current_password = st.text_input("Current Password", type="password", key="current_password")
-            new_password = st.text_input("New Password", type="password", key="new_password")
-            if st.button("Change Password"):
-                if current_password and new_password:
-                    success = change_password(st.session_state.username, current_password, new_password)
-                    if success:
-                        st.success("Password changed successfully!")
+            if st.sidebar.checkbox("Change password"):
+                st.sidebar.header("Change Password")
+                current_password = st.sidebar.text_input("Current Password", type="password", key="current_password")
+                new_password = st.sidebar.text_input("New Password", type="password", key="new_password")
+                if st.sidebar.button("Change Password"):
+                    if current_password and new_password:
+                        success = change_password(st.session_state.username, current_password, new_password)
+                        if success:
+                            st.sidebar.success("Password changed successfully!")
+                        else:
+                            st.sidebar.error("Failed to change password. Please check your current password.")
                     else:
-                        st.error("Failed to change password. Please check your current password.")
-                else:
-                    st.error("Please enter your current password and new password.")
+                        st.sidebar.error("Please enter your current password and new password.")
 
     else:
         st.header("DIG4EL")
