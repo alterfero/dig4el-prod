@@ -110,7 +110,10 @@ def main():
                 json_data = None
             if json_data:
                 session = get_session(os.environ["CQ_DATABASE_URL"])
-                cq_match = session.query(CQ).filter(CQ.uid == json_data.get("cq_uid")).first()
+                cq_uid = json_data.get("cq_uid")
+                if cq_uid is not None:
+                    cq_uid = str(cq_uid)
+                cq_match = session.query(CQ).filter(CQ.uid == cq_uid).first()
                 session.close()
                 if cq_match:
                     cq_title = cq_match.json_data.get("title", "Unknown title")
