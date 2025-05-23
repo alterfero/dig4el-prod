@@ -23,6 +23,12 @@ def _replicate_user(user: User) -> None:
             }
             if 'is_guest' in columns:
                 replica_data['is_guest'] = user.is_guest
+            if 'first_name' in columns:
+                replica_data['first_name'] = user.first_name
+            if 'last_name' in columns:
+                replica_data['last_name'] = user.last_name
+            if 'author_uid' in columns:
+                replica_data['author_uid'] = user.author_uid
 
             replica = User(**replica_data)
             session.add(replica)
@@ -37,13 +43,23 @@ from email.mime.multipart import MIMEMultipart
 import random
 import string
 
-def register_user(username: str, email: str, plain_password: str) -> int | None:
+def register_user(
+    username: str,
+    email: str,
+    plain_password: str,
+    first_name: str,
+    last_name: str,
+    author_uid: str,
+) -> int | None:
     session = get_session(os.environ.get("AUTH_DATABASE_URL"))
     try:
         user = User(
             username=username,
             email=email,
-            password_hash=hash_password(plain_password)
+            password_hash=hash_password(plain_password),
+            first_name=first_name,
+            last_name=last_name,
+            author_uid=author_uid,
         )
         session.add(user)
         session.commit()
@@ -132,7 +148,10 @@ def create_guest_user(username: str) -> int | None:
             username=username,
             email="",
             password_hash="",
-            is_guest=True
+            is_guest=True,
+            first_name="",
+            last_name="",
+            author_uid="",
         )
         session.add(user)
         session.commit()

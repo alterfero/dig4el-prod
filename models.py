@@ -23,6 +23,9 @@ class User(Base):
     username = Column(String(255), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
+    first_name = Column(String(255))
+    last_name = Column(String(255))
+    author_uid = Column(String(255), unique=True)
     is_guest = Column(Boolean, default=False)
 
 class CQ(Base):
@@ -100,19 +103,28 @@ def init_db():
             if isinstance(cq.json_data, dict) and "uid" in cq.json_data:
                 cq.uid = str(cq.json_data["uid"])
 
-    # Ensure the users table has the is_guest column in all databases
+    # Ensure the users table has required columns in all databases
     for engine in (auth_engine, cq_engine, transcription_engine, lcq_engine):
         with engine.begin() as conn:
-            result = conn.execute(
-                text(
-                    """
-                    SELECT column_name FROM information_schema.columns
-                    WHERE table_name='users' AND column_name='is_guest'
-                    """
+            existing_columns = {
+                row[0]
+                for row in conn.execute(
+                    text(
+                        """
+                        SELECT column_name FROM information_schema.columns
+                        WHERE table_name='users'
+                        """
+                    )
                 )
-            )
-            if result.fetchone() is None:
+            }
+            if 'is_guest' not in existing_columns:
                 conn.execute(text("ALTER TABLE users ADD COLUMN is_guest BOOLEAN DEFAULT FALSE"))
+            if 'first_name' not in existing_columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN first_name VARCHAR(255)"))
+            if 'last_name' not in existing_columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN last_name VARCHAR(255)"))
+            if 'author_uid' not in existing_columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN author_uid VARCHAR(255) UNIQUE"))
 
 def get_session(db_url):
     engine = get_engine(db_url)
