@@ -88,6 +88,18 @@ def init_db():
         if result.fetchone() is None:
             conn.execute(text("ALTER TABLE cq ADD COLUMN uid VARCHAR(255)"))
 
+    # Populate missing uid values from json_data if any exist
+    Session = sessionmaker(bind=cq_engine)
+    with Session.begin() as session:
+        missing_uids = (
+            session.query(CQ)
+            .filter(CQ.uid.is_(None))
+            .all()
+        )
+        for cq in missing_uids:
+            if isinstance(cq.json_data, dict) and "uid" in cq.json_data:
+                cq.uid = str(cq.json_data["uid"])
+
     # Ensure the users table has the is_guest column in all databases
     for engine in (auth_engine, cq_engine, transcription_engine, lcq_engine):
         with engine.begin() as conn:
