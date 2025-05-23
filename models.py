@@ -32,20 +32,22 @@ class CQ(Base):
     __tablename__ = "cq"
     id = Column(Integer, primary_key=True, autoincrement=True)
     uid = Column(String(255), unique=True)
+    filename = Column(String(255), nullable=False)
     json_data = Column(JSON, nullable=False)
     author_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     version = Column(String(50), nullable=False)
-    last_update_date = Column(DateTime, default=datetime.utcnow)
+    last_update_date = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     access_authorization = Column(String(50), nullable=False)
     author = relationship("User")
 
 class Transcription(Base):
     __tablename__ = "transcription"
     id = Column(Integer, primary_key=True, autoincrement=True)
+    filename = Column(String(255), nullable=False)
     json_data = Column(JSON, nullable=False)
     author_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     version = Column(String(50), nullable=False)
-    last_update_date = Column(DateTime, default=datetime.utcnow)
+    last_update_date = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     access_authorization = Column(String(50), nullable=False)
     author = relationship("User")
 
@@ -55,7 +57,8 @@ class LegacyCQ(Base):
     filename = Column(String(255), nullable=False)
     file_data = Column(LargeBinary, nullable=False)
     author_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    last_update_date = Column(DateTime, default=datetime.utcnow)
+    version = Column(Integer, nullable=False, default=1)
+    last_update_date = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     access_authorization = Column(String(50), nullable=False)
     author = relationship("User")
 
@@ -77,6 +80,45 @@ def init_db():
     Base.metadata.create_all(cq_engine)
     Base.metadata.create_all(transcription_engine)
     Base.metadata.create_all(lcq_engine)
+
+    # Ensure the legacy_cq table has the version column
+    with lcq_engine.begin() as conn:
+        result = conn.execute(
+            text(
+                """
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='legacy_cq' AND column_name='version'
+                """
+            )
+        )
+        if result.fetchone() is None:
+            conn.execute(text("ALTER TABLE legacy_cq ADD COLUMN version INTEGER DEFAULT 1"))
+
+    # Ensure cq table has the filename column
+    with cq_engine.begin() as conn:
+        result = conn.execute(
+            text(
+                """
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='cq' AND column_name='filename'
+                """
+            )
+        )
+        if result.fetchone() is None:
+            conn.execute(text("ALTER TABLE cq ADD COLUMN filename VARCHAR(255)"))
+
+    # Ensure transcription table has the filename column
+    with transcription_engine.begin() as conn:
+        result = conn.execute(
+            text(
+                """
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='transcription' AND column_name='filename'
+                """
+            )
+        )
+        if result.fetchone() is None:
+            conn.execute(text("ALTER TABLE transcription ADD COLUMN filename VARCHAR(255)"))
 
     # Ensure the cq table has the uid column
     with cq_engine.begin() as conn:

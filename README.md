@@ -139,3 +139,6 @@ The login page now includes a "Login as Guest" button. Guests don't need to regi
 
 ### Legacy CQ Uploads
 Logged in users can also upload and download legacy CQ documents (Word, Excel, PDF...). These files are stored in a dedicated database.
+
+### Automatic Document Versioning
+When a user uploads a document, DIG4EL now manages version numbers automatically. If the filename has never been uploaded before, the file is stored with version `1`. When the filename already exists, users can choose to update the existing entry. Updating replaces the previous content and increments the version number. Selecting "No" cancels the upload.
