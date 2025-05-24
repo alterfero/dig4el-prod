@@ -54,8 +54,8 @@ class LegacyCQ(Base):
     __tablename__ = "legacy_cq"
     id = Column(Integer, primary_key=True, autoincrement=True)
     filename = Column(String(255), nullable=False)
-    interviewer = Column(Integer, ForeignKey('users.id'), nullable=False)
-    consultant = Column(Integer, ForeignKey('users.id'), nullable=False)
+    interviewer = Column(String(255), nullable=False)
+    consultant = Column(String(255), nullable=False)
     author_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     version = Column(String(50), nullable=False, default="1")
     last_update_date = Column(
@@ -82,6 +82,35 @@ def init_db():
     Base.metadata.create_all(cq_engine)
     Base.metadata.create_all(transcription_engine)
     Base.metadata.create_all(lcq_engine)
+
+    # Ensure legacy_cq has interviewer and consultant columns as text
+    with lcq_engine.begin() as conn:
+        result = conn.execute(
+            text(
+                """
+                SELECT column_name, data_type FROM information_schema.columns
+                WHERE table_name='legacy_cq' AND column_name IN ('interviewer','consultant')
+                """
+            )
+        )
+        columns = {row[0]: row[1] for row in result}
+        if 'interviewer' not in columns:
+            conn.execute(text("ALTER TABLE legacy_cq ADD COLUMN interviewer VARCHAR(255)"))
+        elif columns['interviewer'] != 'character varying':
+            conn.execute(
+                text(
+                    "ALTER TABLE legacy_cq ALTER COLUMN interviewer TYPE VARCHAR(255) USING interviewer::VARCHAR"
+                )
+            )
+
+        if 'consultant' not in columns:
+            conn.execute(text("ALTER TABLE legacy_cq ADD COLUMN consultant VARCHAR(255)"))
+        elif columns['consultant'] != 'character varying':
+            conn.execute(
+                text(
+                    "ALTER TABLE legacy_cq ALTER COLUMN consultant TYPE VARCHAR(255) USING consultant::VARCHAR"
+                )
+            )
 
     # Ensure cq table has the filename column
     with cq_engine.begin() as conn:

@@ -218,21 +218,11 @@ def main():
                     f"{lcq.author.first_name or ''} {lcq.author.last_name or ''}"
                 ).strip() or lcq.author.username
 
-                interviewer_user = session_lcq.query(User).get(lcq.interviewer)
-                interviewer_name = (
-                    f"{interviewer_user.first_name or ''} {interviewer_user.last_name or ''}"
-                ).strip() if interviewer_user else "unknown"
-
-                consultant_user = session_lcq.query(User).get(lcq.consultant)
-                consultant_name = (
-                    f"{consultant_user.first_name or ''} {consultant_user.last_name or ''}"
-                ).strip() if consultant_user else "unknown"
-
                 lcq_data_list.append(
                     {
                         "filename": lcq.filename,
-                        "Interviewer": interviewer_name or (interviewer_user.username if interviewer_user else ""),
-                        "Consultant": consultant_name or (consultant_user.username if consultant_user else ""),
+                        "Interviewer": lcq.interviewer,
+                        "Consultant": lcq.consultant,
                         "author": author_name,
                         "last update": lcq.last_update_date,
                         "access": lcq.access_authorization,
@@ -408,23 +398,21 @@ def main():
                                     st.info("Upload cancelled")
                                     session.close()
                                 else:
-                                    interviewer_user = session.query(User).filter(User.username == interviewer_name).first()
-                                    consultant_user = session.query(User).filter(User.username == consultant_name).first()
-                                    if not interviewer_user or not consultant_user:
-                                        st.error("Interviewer or consultant not found")
+                                    if not interviewer_name or not consultant_name:
+                                        st.error("Please provide interviewer and consultant names")
                                         session.close()
                                     else:
                                         if existing:
-                                            existing.interviewer = interviewer_user.id
-                                            existing.consultant = consultant_user.id
+                                            existing.interviewer = interviewer_name
+                                            existing.consultant = consultant_name
                                             existing.author_id = st.session_state.user_id
                                             existing.access_authorization = upload_access_authorization
                                             existing.version = str(int(existing.version) + 1)
                                         else:
                                             new_lcq = LegacyCQ(
                                                 filename=uploaded_file.name,
-                                                interviewer=interviewer_user.id,
-                                                consultant=consultant_user.id,
+                                                interviewer=interviewer_name,
+                                                consultant=consultant_name,
                                                 author_id=st.session_state.user_id,
                                                 version="1",
                                                 access_authorization=upload_access_authorization,

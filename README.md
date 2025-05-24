@@ -138,7 +138,7 @@ When uploading a CQ, the user can choose a sharing authorization among: "No shar
 The login page now includes a "Login as Guest" button. Guests don't need to register (no username, email, or password needed). They can use the software but are restricted in their actions (they can't upload anything, or read content reserved to registered users).
 
 ### Legacy CQ Uploads
-Logged in users can also upload and download legacy CQ documents (Word, Excel, PDF...). These files are stored in a dedicated database.
+Logged in users can also upload and download legacy CQ documents (Word, Excel, PDF...). These files are stored in a dedicated database. When uploading a Legacy CQ the user simply provides the interviewer and consultant names. They don't need to correspond to registered usernames, but both fields must be filled and the uploader must certify authorisation via the checkbox.
 
 ### Automatic Document Versioning
 When a user uploads a document, DIG4EL now manages version numbers automatically. If the filename has never been uploaded before, the file is stored with version `1`. When the filename already exists, users can choose to update the existing entry. Updating replaces the previous content and increments the version number. Selecting "No" cancels the upload.
