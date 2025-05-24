@@ -94,6 +94,23 @@ def init_db():
             )
         )
         columns = {row[0]: row[1] for row in result}
+
+        # Drop old foreign key constraints if they exist
+        fk_query = text(
+            """
+            SELECT tc.constraint_name, kcu.column_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+              ON tc.constraint_name = kcu.constraint_name
+             AND tc.table_schema = kcu.table_schema
+            WHERE tc.table_name='legacy_cq'
+              AND tc.constraint_type='FOREIGN KEY'
+              AND kcu.column_name IN ('interviewer','consultant')
+            """
+        )
+        for constraint_name, col in conn.execute(fk_query):
+            conn.execute(text(f"ALTER TABLE legacy_cq DROP CONSTRAINT {constraint_name}"))
+
         if 'interviewer' not in columns:
             conn.execute(text("ALTER TABLE legacy_cq ADD COLUMN interviewer VARCHAR(255)"))
         elif columns['interviewer'] != 'character varying':
