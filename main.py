@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 import random
 import string
-from models import init_db, get_session, CQ, Transcription, LegacyCQ
+from models import init_db, get_session, CQ, Transcription, LegacyCQ, User
 from user_service import (
     register_user,
     authenticate_user,
@@ -215,11 +215,24 @@ def main():
             lcq_data_list = []
             for lcq in lcq_data:
                 author_name = (
-                                  f"{lcq.author.first_name or ''} {lcq.author.last_name or ''}"
-                              ).strip() or lcq.author.username
+                    f"{lcq.author.first_name or ''} {lcq.author.last_name or ''}"
+                ).strip() or lcq.author.username
+
+                interviewer_user = session_lcq.query(User).get(lcq.interviewer)
+                interviewer_name = (
+                    f"{interviewer_user.first_name or ''} {interviewer_user.last_name or ''}"
+                ).strip() if interviewer_user else "unknown"
+
+                consultant_user = session_lcq.query(User).get(lcq.consultant)
+                consultant_name = (
+                    f"{consultant_user.first_name or ''} {consultant_user.last_name or ''}"
+                ).strip() if consultant_user else "unknown"
+
                 lcq_data_list.append(
                     {
                         "filename": lcq.filename,
+                        "Interviewer": interviewer_name or (interviewer_user.username if interviewer_user else ""),
+                        "Consultant": consultant_name or (consultant_user.username if consultant_user else ""),
                         "author": author_name,
                         "last update": lcq.last_update_date,
                         "access": lcq.access_authorization,
@@ -272,6 +285,11 @@ def main():
                 uploaded_file = None
                 if upload_type == "Legacy CQ":
                     uploaded_file = st.file_uploader("Legacy CQ File")
+                    interviewer_name = st.text_input("Interviewer username")
+                    consultant_name = st.text_input("Consultant username")
+                    consultant_auth = st.checkbox(
+                        "I have the authorization from the consultant to upload this document with the access authorization chosen"
+                    )
                 elif upload_type == "CQ":
                     uploaded_file = st.file_uploader("CQ JSON File", type=["json"])
                 else:
@@ -383,28 +401,38 @@ def main():
                             json_data = None
                         if st.button("Upload"):
                             if upload_type == "Legacy CQ":
-                                if existing and confirm_update_lcq != "Yes":
+                                if not consultant_auth:
+                                    st.error("Please confirm you have the consultant's authorization")
+                                    session.close()
+                                elif existing and confirm_update_lcq != "Yes":
                                     st.info("Upload cancelled")
                                     session.close()
                                 else:
-                                    file_content = uploaded_file.read()
-                                    if existing:
-                                        existing.file_data = file_content
-                                        existing.author_id = st.session_state.user_id
-                                        existing.access_authorization = upload_access_authorization
-                                        existing.version = existing.version + 1
+                                    interviewer_user = session.query(User).filter(User.username == interviewer_name).first()
+                                    consultant_user = session.query(User).filter(User.username == consultant_name).first()
+                                    if not interviewer_user or not consultant_user:
+                                        st.error("Interviewer or consultant not found")
+                                        session.close()
                                     else:
-                                        new_lcq = LegacyCQ(
-                                            filename=uploaded_file.name,
-                                            file_data=file_content,
-                                            author_id=st.session_state.user_id,
-                                            version=1,
-                                            access_authorization=upload_access_authorization,
-                                        )
-                                        session.add(new_lcq)
-                                    session.commit()
-                                    session.close()
-                                    st.success("Legacy CQ uploaded successfully!")
+                                        if existing:
+                                            existing.interviewer = interviewer_user.id
+                                            existing.consultant = consultant_user.id
+                                            existing.author_id = st.session_state.user_id
+                                            existing.access_authorization = upload_access_authorization
+                                            existing.version = str(int(existing.version) + 1)
+                                        else:
+                                            new_lcq = LegacyCQ(
+                                                filename=uploaded_file.name,
+                                                interviewer=interviewer_user.id,
+                                                consultant=consultant_user.id,
+                                                author_id=st.session_state.user_id,
+                                                version="1",
+                                                access_authorization=upload_access_authorization,
+                                            )
+                                            session.add(new_lcq)
+                                        session.commit()
+                                        session.close()
+                                        st.success("Legacy CQ uploaded successfully!")
                             elif upload_type == "CQ" and json_data:
                                 session = get_session(os.environ["CQ_DATABASE_URL"])
                                 if existing_cq and confirm_update_cq != "Yes":

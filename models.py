@@ -7,7 +7,6 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Boolean,
-    LargeBinary,
     create_engine,
     text,
 )
@@ -55,10 +54,13 @@ class LegacyCQ(Base):
     __tablename__ = "legacy_cq"
     id = Column(Integer, primary_key=True, autoincrement=True)
     filename = Column(String(255), nullable=False)
-    file_data = Column(LargeBinary, nullable=False)
+    interviewer = Column(Integer, ForeignKey('users.id'), nullable=False)
+    consultant = Column(Integer, ForeignKey('users.id'), nullable=False)
     author_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    version = Column(Integer, nullable=False, default=1)
-    last_update_date = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    version = Column(String(50), nullable=False, default="1")
+    last_update_date = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
     access_authorization = Column(String(50), nullable=False)
     author = relationship("User")
 
@@ -80,19 +82,6 @@ def init_db():
     Base.metadata.create_all(cq_engine)
     Base.metadata.create_all(transcription_engine)
     Base.metadata.create_all(lcq_engine)
-
-    # Ensure the legacy_cq table has the version column
-    with lcq_engine.begin() as conn:
-        result = conn.execute(
-            text(
-                """
-                SELECT column_name FROM information_schema.columns
-                WHERE table_name='legacy_cq' AND column_name='version'
-                """
-            )
-        )
-        if result.fetchone() is None:
-            conn.execute(text("ALTER TABLE legacy_cq ADD COLUMN version INTEGER DEFAULT 1"))
 
     # Ensure cq table has the filename column
     with cq_engine.begin() as conn:
