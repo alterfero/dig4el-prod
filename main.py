@@ -285,8 +285,8 @@ def main():
                 uploaded_file = None
                 if upload_type == "Legacy CQ":
                     uploaded_file = st.file_uploader("Legacy CQ File")
-                    interviewer_name = st.text_input("Interviewer username")
-                    consultant_name = st.text_input("Consultant username")
+                    interviewer_name = st.text_input("Interviewer name")
+                    consultant_name = st.text_input("Consultant name")
                     consultant_auth = st.checkbox(
                         "I have the authorization from the consultant to upload this document with the access authorization chosen"
                     )
