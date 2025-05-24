@@ -62,7 +62,7 @@ class LegacyCQ(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
     access_authorization = Column(String(50), nullable=False)
-    author = relationship("User")
+    author = relationship("User", foreign_keys=[author_id])
 
 def get_engine(db_url):
     return create_engine(db_url, echo=True)
