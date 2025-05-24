@@ -50,10 +50,63 @@ def main():
                 ).all()
             else:
                 cq_data = session.query(CQ).filter(
-                    (CQ.author_id == st.session_state.user_id) |
-                    (CQ.access_authorization == "Can be read by other registered users") |
-                    (CQ.access_authorization == "Can be read by unregistered guests")
+                    (CQ.author_id == st.session_state.user_id)
+                    | (CQ.access_authorization == "Can be read by other registered users")
+                    | (CQ.access_authorization == "Can be read by unregistered guests")
                 ).all()
+
+            st.subheader("Conversational Questionnaires")
+            cq_data_list = []
+            for cq in cq_data:
+                author_name = (
+                    f"{cq.author.first_name or ''} {cq.author.last_name or ''}"
+                ).strip() or cq.author.username
+                cq_data_list.append(
+                    {
+                        "title": cq.json_data.get("title", "no title"),
+                        "author": author_name,
+                        "last update": cq.last_update_date,
+                        "access": cq.access_authorization,
+                    }
+                )
+            st.dataframe(pd.DataFrame(cq_data_list))
+
+            # Allow editing or removing if the logged-in user is the author
+            for cq in cq_data:
+                if cq.author_id == st.session_state.user_id:
+                    with st.expander(
+                        f"Manage CQ: {cq.json_data.get('title', 'no title')}",
+                        expanded=False,
+                    ):
+                        access_options = [
+                            "No sharing",
+                            "Can be read by other registered users",
+                            "Can be read by unregistered guests",
+                        ]
+                        access_index = access_options.index(cq.access_authorization)
+                        new_access = st.selectbox(
+                            "Access Authorization",
+                            access_options,
+                            index=access_index,
+                            key=f"cq_access_{cq.id}",
+                        )
+                        if st.button("Update Access", key=f"update_cq_{cq.id}"):
+                            update_session = get_session(os.environ["CQ_DATABASE_URL"])
+                            item = update_session.query(CQ).get(cq.id)
+                            item.access_authorization = new_access
+                            update_session.commit()
+                            update_session.close()
+                            st.success("Access updated")
+                            st.rerun()
+                        if st.button("Delete", key=f"delete_cq_{cq.id}"):
+                            delete_session = get_session(os.environ["CQ_DATABASE_URL"])
+                            item = delete_session.query(CQ).get(cq.id)
+                            delete_session.delete(item)
+                            delete_session.commit()
+                            delete_session.close()
+                            st.success("CQ removed")
+                            st.rerun()
+
             session.close()
 
             session = get_session(os.environ["TRANSCRIPTION_DATABASE_URL"])
@@ -67,7 +120,9 @@ def main():
                     (Transcription.access_authorization == "Can be read by other registered users") |
                     (Transcription.access_authorization == "Can be read by unregistered guests")
                 ).all()
-            session.close()
+            # close after editing Transcriptions later
+
+            session_transcription = session
 
             session = get_session(os.environ["LCQ_DATABASE_URL"])
             if st.session_state.is_guest:
@@ -80,47 +135,118 @@ def main():
                     (LegacyCQ.access_authorization == "Can be read by other registered users") |
                     (LegacyCQ.access_authorization == "Can be read by unregistered guests")
                 ).all()
-            session.close()
+            session_lcq = session
 
-            st.subheader("Conversational Questionnaires")
-            cq_data_list = []
-            for cq in cq_data:
-                cq_data_list.append({
-                    "title": cq.json_data.get("title", "no title"),
-                    "author": cq.author_id,
-                    "last update": cq.last_update_date,
-                    "access": cq.access_authorization
-                }
-                )
-            st.dataframe(pd.DataFrame(cq_data_list))
 
             st.subheader("Transcriptions")
             transcription_data_list = []
             for transcription in transcription_data:
+                guardian_name = (
+                    f"{transcription.author.first_name or ''} {transcription.author.last_name or ''}"
+                ).strip() or transcription.author.username
                 transcription_data_list.append(
                     {
-                        "Guardian": transcription.author_id,
+                        "Guardian": guardian_name,
                         "Consultant": transcription.json_data.get("interviewee", "unknown"),
                         "Interviewer": transcription.json_data.get("interviewer", "unknown"),
                         "last update": transcription.last_update_date,
-                        "access": transcription.access_authorization
+                        "access": transcription.access_authorization,
                     }
 
                 )
             st.dataframe(pd.DataFrame(transcription_data_list))
 
+            for transcription in transcription_data:
+                if transcription.author_id == st.session_state.user_id:
+                    with st.expander(
+                        f"Manage Transcription: {transcription.filename}",
+                        expanded=False,
+                    ):
+                        access_options = [
+                            "No sharing",
+                            "Can be read by other registered users",
+                            "Can be read by unregistered guests",
+                        ]
+                        access_index = access_options.index(
+                            transcription.access_authorization
+                        )
+                        new_access = st.selectbox(
+                            "Access Authorization",
+                            access_options,
+                            index=access_index,
+                            key=f"trans_access_{transcription.id}",
+                        )
+                        if st.button(
+                            "Update Access",
+                            key=f"update_trans_{transcription.id}",
+                        ):
+                            update_session = get_session(os.environ["TRANSCRIPTION_DATABASE_URL"])
+                            item = update_session.query(Transcription).get(transcription.id)
+                            item.access_authorization = new_access
+                            update_session.commit()
+                            update_session.close()
+                            st.success("Access updated")
+                            st.rerun()
+                        if st.button("Delete", key=f"delete_trans_{transcription.id}"):
+                            delete_session = get_session(os.environ["TRANSCRIPTION_DATABASE_URL"])
+                            item = delete_session.query(Transcription).get(transcription.id)
+                            delete_session.delete(item)
+                            delete_session.commit()
+                            delete_session.close()
+                            st.success("Transcription removed")
+                            st.rerun()
+            session_transcription.close()
+
             st.subheader("ConQuest: Legacy Conversational Questionnaires")
             lcq_data_list = []
             for lcq in lcq_data:
+                author_name = (
+                    f"{lcq.author.first_name or ''} {lcq.author.last_name or ''}"
+                ).strip() or lcq.author.username
                 lcq_data_list.append(
                     {
                         "filename": lcq.filename,
-                        "author": lcq.author_id,
+                        "author": author_name,
                         "last update": lcq.last_update_date,
-                        "access": lcq.access_authorization
+                        "access": lcq.access_authorization,
                     }
                 )
             st.dataframe(pd.DataFrame(lcq_data_list))
+
+            for lcq in lcq_data:
+                if lcq.author_id == st.session_state.user_id:
+                    with st.expander(
+                        f"Manage Legacy CQ: {lcq.filename}", expanded=False
+                    ):
+                        access_options = [
+                            "No sharing",
+                            "Can be read by other registered users",
+                            "Can be read by unregistered guests",
+                        ]
+                        access_index = access_options.index(lcq.access_authorization)
+                        new_access = st.selectbox(
+                            "Access Authorization",
+                            access_options,
+                            index=access_index,
+                            key=f"lcq_access_{lcq.id}",
+                        )
+                        if st.button("Update Access", key=f"update_lcq_{lcq.id}"):
+                            update_session = get_session(os.environ["LCQ_DATABASE_URL"])
+                            item = update_session.query(LegacyCQ).get(lcq.id)
+                            item.access_authorization = new_access
+                            update_session.commit()
+                            update_session.close()
+                            st.success("Access updated")
+                            st.rerun()
+                        if st.button("Delete", key=f"delete_lcq_{lcq.id}"):
+                            delete_session = get_session(os.environ["LCQ_DATABASE_URL"])
+                            item = delete_session.query(LegacyCQ).get(lcq.id)
+                            delete_session.delete(item)
+                            delete_session.commit()
+                            delete_session.close()
+                            st.success("Legacy CQ removed")
+                            st.rerun()
+            session_lcq.close()
 
         # Upload Section
         with st.expander("Upload documents"):
