@@ -215,25 +215,28 @@ def main():
             lcq_data_list = []
             for lcq in lcq_data:
                 guardian_name = (
-                                    f"{transcription.author.first_name or ''} {transcription.author.last_name or ''}"
-                                ).strip() or transcription.author.username
-                transcription_data_list.append(
+                    f"{lcq.author.first_name or ''} {lcq.author.last_name or ''}"
+                ).strip() or lcq.author.username
+                lcq_data_list.append(
                     {
                         "Guardian": guardian_name,
                         "Consultant": lcq.consultant,
                         "Interviewer": lcq.interviewer,
-                        "last update": transcription.last_update_date,
-                        "access": transcription.access_authorization,
-                        "author_id": transcription.author_id,
-                        "filename": transcription.filename
+                        "last update": lcq.last_update_date,
+                        "access": lcq.access_authorization,
+                        "author_id": lcq.author_id,
+                        "filename": lcq.filename,
                     }
 
                 )
 
             lcq_df = pd.DataFrame(lcq_data_list)
-            selected_lcq = st.dataframe(lcq_df, on_select="rerun",
-                                                  selection_mode="single-row",
-                                                  column_config={"author_id": None, "filename": None})
+            selected_lcq = st.dataframe(
+                lcq_df,
+                on_select="rerun",
+                selection_mode="single-row",
+                column_config={"author_id": None, "filename": None},
+            )
 
             # Allow editing or removing the selected document if the logged-in user is the author
             if selected_lcq["selection"]["rows"] != []:
@@ -249,34 +252,34 @@ def main():
                         "Can be read by unregistered guests",
                     ]
                     access_index = access_options.index(
-                        lcq.access_authorization
+                        current_lcq.access_authorization
                     )
                     new_access = st.selectbox(
                         "Change Access Authorization",
                         access_options,
                         index=access_index,
-                        key=f"trans_access_{lcq.id}",
+                        key=f"lcq_access_{current_lcq.id}",
                     )
                     if st.button(
                             "Update Access",
-                            key=f"update_trans_{lcq.id}",
+                            key=f"update_lcq_{current_lcq.id}",
                     ):
                         update_session = get_session(os.environ["LCQ_DATABASE_URL"])
-                        item = update_session.query(LegacyCQ).get(lcq.id)
+                        item = update_session.query(LegacyCQ).get(current_lcq.id)
                         item.access_authorization = new_access
                         update_session.commit()
                         update_session.close()
                         st.success("Access updated")
                         st.rerun()
-                    if st.button("Delete", key=f"delete_trans_{lcq.id}"):
+                    if st.button("Delete", key=f"delete_lcq_{current_lcq.id}"):
                         delete_session = get_session(os.environ["LCQ_DATABASE_URL"])
-                        item = delete_session.query(LegacyCQ).get(transcription.id)
+                        item = delete_session.query(LegacyCQ).get(current_lcq.id)
                         delete_session.delete(item)
                         delete_session.commit()
                         delete_session.close()
                         st.success("Legacy Tanscription removed")
                         st.rerun()
-                    session_transcription.close()
+                    session_lcq.close()
                 else:
                     st.write("You must be the guardian of a document to change its attributes.")
 
@@ -289,7 +292,9 @@ def main():
                 upload_type = st.selectbox("Select Upload Type", ["CQ", "Transcription", "Legacy Transcription"])
                 uploaded_file = None
                 if upload_type == "Legacy Transcription":
-                    uploaded_file = st.file_uploader("Legacy Transcription File")
+                    uploaded_file = st.file_uploader(
+                        "Legacy Transcription File", type=None, key="legacy_file"
+                    )
                     interviewer_name = st.text_input("Interviewer name")
                     consultant_name = st.text_input("Consultant name")
                     consultant_auth = st.checkbox(
@@ -417,12 +422,18 @@ def main():
                                         st.error("Please provide interviewer and consultant names")
                                         session.close()
                                     else:
+                                        os.makedirs("legacy_files", exist_ok=True)
+                                        file_path = os.path.join("legacy_files", uploaded_file.name)
+                                        with open(file_path, "wb") as out_file:
+                                            out_file.write(uploaded_file.getbuffer())
+
                                         if existing:
                                             existing.interviewer = interviewer_name
                                             existing.consultant = consultant_name
                                             existing.author_id = st.session_state.user_id
                                             existing.access_authorization = upload_access_authorization
                                             existing.version = str(int(existing.version) + 1)
+                                            existing.file_path = file_path
                                         else:
                                             new_lcq = LegacyCQ(
                                                 filename=uploaded_file.name,
@@ -431,6 +442,7 @@ def main():
                                                 author_id=st.session_state.user_id,
                                                 version="1",
                                                 access_authorization=upload_access_authorization,
+                                                file_path=file_path,
                                             )
                                             session.add(new_lcq)
                                         session.commit()
