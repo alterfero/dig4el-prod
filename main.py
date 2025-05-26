@@ -25,6 +25,7 @@ st.set_page_config(
 
 
 def main():
+    c = 0
     init_db()  # Initialize the databases
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
@@ -57,7 +58,6 @@ def main():
                     | (CQ.access_authorization == "Can be read by other registered users")
                     | (CQ.access_authorization == "Can be read by unregistered guests")
                 ).all()
-            c = 0
             st.subheader("Conversational Questionnaires")
             cq_data_list = []
             for cq in cq_data:
@@ -77,7 +77,9 @@ def main():
             cq_df = pd.DataFrame(cq_data_list)
             selected_cq = st.dataframe(cq_df, on_select="rerun",
                                        selection_mode="single-row",
-                                       column_config={"author_id":None, "filename":None})
+                                       column_config={"author_id":None, "filename":None},
+                                       key="cq_df_"+str(c))
+            c += 1
             # Allow editing or removing the selected document if the logged-in user is the author
             if selected_cq["selection"]["rows"] != []:
                 if cq_df.iloc[selected_cq["selection"]["rows"][0]]["author_id"] == \
@@ -139,6 +141,7 @@ def main():
                 transcription_data_list.append(
                     {
                         "Guardian": guardian_name,
+                        "title": transcription.filename,
                         "Consultant": transcription.json_data.get("interviewee", "unknown"),
                         "Interviewer": transcription.json_data.get("interviewer", "unknown"),
                         "last update": transcription.last_update_date,
@@ -152,7 +155,9 @@ def main():
             transcription_df = pd.DataFrame(transcription_data_list)
             selected_transcription = st.dataframe(transcription_df, on_select="rerun",
                                        selection_mode="single-row",
-                                       column_config={"author_id": None, "filename": None})
+                                       column_config={"author_id": None, "filename": None},
+                                        key="transcription_df_"+str(c))
+            c += 1
 
             # Allow editing or removing the selected document if the logged-in user is the author
             if selected_transcription["selection"]["rows"] != []:
@@ -211,7 +216,7 @@ def main():
                 ).all()
             session_lcq = session
 
-            st.subheader("ConQuest: Legacy Transcriptions on Excel format")
+            st.subheader("ConQuest: Legacy Transcriptions")
             lcq_data_list = []
             for lcq in lcq_data:
                 guardian_name = (
@@ -235,9 +240,10 @@ def main():
                 lcq_df,
                 on_select="rerun",
                 selection_mode="single-row",
-                column_config={"author_id": None, "filename": None},
+                column_config={"author_id": None},
+                key="lcq_df_" + str(c)
             )
-
+            c += 1
             # Allow editing or removing the selected document if the logged-in user is the author
             if selected_lcq["selection"]["rows"] != []:
                 if lcq_df.iloc[selected_lcq["selection"]["rows"][0]]["author_id"] == \
@@ -286,7 +292,7 @@ def main():
         # Upload Section
         with st.expander("Upload documents"):
             if st.session_state.is_guest:
-                st.write("Register to upload document")
+                st.write("You must register to upload document: If you want to upload document and access documents visible to registered users, log out, then follow the registration process.")
             else:
                 st.subheader("Upload CQ, DIG4EL Transcription or Legacy Transcription")
                 upload_type = st.selectbox("Select Upload Type", ["CQ", "Transcription", "Legacy Transcription"])
