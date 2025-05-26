@@ -164,16 +164,27 @@ def send_email(to_email: str, temp_password: str) -> None:
         print(f"Failed to send email: {e}")
 
 def create_guest_user(username: str) -> int | None:
+    """Create a temporary guest user.
+
+    Guest accounts use random placeholder values for fields that are unique in
+    the database (``email`` and ``author_uid``).  Failing to do so would raise an
+    ``IntegrityError`` after the first guest login because subsequent guests
+    would attempt to insert duplicate empty strings.
+    """
+
     session = get_session(os.environ.get("AUTH_DATABASE_URL"))
     try:
+        unique_suffix = "".join(
+            random.choices(string.ascii_lowercase + string.digits, k=8)
+        )
         user = User(
             username=username,
-            email="",
+            email=f"{username}@guest",  # placeholder but unique per username
             password_hash="",
             is_guest=True,
             first_name="",
             last_name="",
-            author_uid="",
+            author_uid=f"guest_{unique_suffix}",
         )
         session.add(user)
         session.commit()
