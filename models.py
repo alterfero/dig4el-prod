@@ -54,6 +54,7 @@ class LegacyCQ(Base):
     __tablename__ = "legacy_cq"
     id = Column(Integer, primary_key=True, autoincrement=True)
     filename = Column(String(255), nullable=False)
+    file_path = Column(String(255))
     interviewer = Column(String(255), nullable=False)
     consultant = Column(String(255), nullable=False)
     author_id = Column(Integer, ForeignKey('users.id'), nullable=False)
@@ -128,6 +129,19 @@ def init_db():
                     "ALTER TABLE legacy_cq ALTER COLUMN consultant TYPE VARCHAR(255) USING consultant::VARCHAR"
                 )
             )
+
+    # Ensure legacy_cq has the file_path column
+    with lcq_engine.begin() as conn:
+        result = conn.execute(
+            text(
+                """
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name='legacy_cq' AND column_name='file_path'
+                """
+            )
+        )
+        if result.fetchone() is None:
+            conn.execute(text("ALTER TABLE legacy_cq ADD COLUMN file_path VARCHAR(255)"))
 
     # Ensure cq table has the filename column
     with cq_engine.begin() as conn:
