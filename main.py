@@ -130,19 +130,6 @@ def main():
 
             session_transcription = session
 
-            session = get_session(os.environ["LCQ_DATABASE_URL"])
-            if st.session_state.is_guest:
-                lcq_data = session.query(LegacyCQ).filter(
-                    LegacyCQ.access_authorization == "Can be read by unregistered guests"
-                ).all()
-            else:
-                lcq_data = session.query(LegacyCQ).filter(
-                    (LegacyCQ.author_id == st.session_state.user_id) |
-                    (LegacyCQ.access_authorization == "Can be read by other registered users") |
-                    (LegacyCQ.access_authorization == "Can be read by unregistered guests")
-                ).all()
-            session_lcq = session
-
             st.subheader("Transcriptions")
             transcription_data_list = []
             for transcription in transcription_data:
@@ -209,72 +196,100 @@ def main():
                     session_transcription.close()
                 else:
                     st.write("You must be the guardian of a document to change its attributes.")
-            st.subheader("ConQuest: Legacy Conversational Questionnaires")
 
             # LEGACY TRANSCRIPTION
+            session = get_session(os.environ["LCQ_DATABASE_URL"])
+            if st.session_state.is_guest:
+                lcq_data = session.query(LegacyCQ).filter(
+                    LegacyCQ.access_authorization == "Can be read by unregistered guests"
+                ).all()
+            else:
+                lcq_data = session.query(LegacyCQ).filter(
+                    (LegacyCQ.author_id == st.session_state.user_id) |
+                    (LegacyCQ.access_authorization == "Can be read by other registered users") |
+                    (LegacyCQ.access_authorization == "Can be read by unregistered guests")
+                ).all()
+            session_lcq = session
+
+            st.subheader("ConQuest: Legacy Transcriptions on Excel format")
             lcq_data_list = []
             for lcq in lcq_data:
-                author_name = (
-                    f"{lcq.author.first_name or ''} {lcq.author.last_name or ''}"
-                ).strip() or lcq.author.username
-
-                lcq_data_list.append(
+                guardian_name = (
+                                    f"{transcription.author.first_name or ''} {transcription.author.last_name or ''}"
+                                ).strip() or transcription.author.username
+                transcription_data_list.append(
                     {
-                        "filename": lcq.filename,
-                        "Interviewer": lcq.interviewer,
+                        "Guardian": guardian_name,
                         "Consultant": lcq.consultant,
-                        "author": author_name,
-                        "last update": lcq.last_update_date,
-                        "access": lcq.access_authorization,
+                        "Interviewer": lcq.interviewer,
+                        "last update": transcription.last_update_date,
+                        "access": transcription.access_authorization,
+                        "author_id": transcription.author_id,
+                        "filename": transcription.filename
                     }
-                )
-            st.dataframe(pd.DataFrame(lcq_data_list))
 
-            for lcq in lcq_data:
-                if lcq.author_id == st.session_state.user_id:
-                    with st.expander(
-                            f"Manage Legacy CQ: {lcq.filename}", expanded=False
+                )
+
+            lcq_df = pd.DataFrame(lcq_data_list)
+            selected_lcq = st.dataframe(lcq_df, on_select="rerun",
+                                                  selection_mode="single-row",
+                                                  column_config={"author_id": None, "filename": None})
+
+            # Allow editing or removing the selected document if the logged-in user is the author
+            if selected_lcq["selection"]["rows"] != []:
+                if lcq_df.iloc[selected_lcq["selection"]["rows"][0]]["author_id"] == \
+                        st.session_state.user_id:
+                    current_lcq = [lcq for lcq in lcq_data if
+                                             lcq.filename ==
+                                             lcq_df.iloc[selected_lcq["selection"]["rows"][0]][
+                                                 "filename"]][0]
+                    access_options = [
+                        "No sharing",
+                        "Can be read by other registered users",
+                        "Can be read by unregistered guests",
+                    ]
+                    access_index = access_options.index(
+                        lcq.access_authorization
+                    )
+                    new_access = st.selectbox(
+                        "Change Access Authorization",
+                        access_options,
+                        index=access_index,
+                        key=f"trans_access_{lcq.id}",
+                    )
+                    if st.button(
+                            "Update Access",
+                            key=f"update_trans_{lcq.id}",
                     ):
-                        access_options = [
-                            "No sharing",
-                            "Can be read by other registered users",
-                            "Can be read by unregistered guests",
-                        ]
-                        access_index = access_options.index(lcq.access_authorization)
-                        new_access = st.selectbox(
-                            "Access Authorization",
-                            access_options,
-                            index=access_index,
-                            key=f"lcq_access_{lcq.id}",
-                        )
-                        if st.button("Update Access", key=f"update_lcq_{lcq.id}"):
-                            update_session = get_session(os.environ["LCQ_DATABASE_URL"])
-                            item = update_session.query(LegacyCQ).get(lcq.id)
-                            item.access_authorization = new_access
-                            update_session.commit()
-                            update_session.close()
-                            st.success("Access updated")
-                            st.rerun()
-                        if st.button("Delete", key=f"delete_lcq_{lcq.id}"):
-                            delete_session = get_session(os.environ["LCQ_DATABASE_URL"])
-                            item = delete_session.query(LegacyCQ).get(lcq.id)
-                            delete_session.delete(item)
-                            delete_session.commit()
-                            delete_session.close()
-                            st.success("Legacy CQ removed")
-                            st.rerun()
-            session_lcq.close()
+                        update_session = get_session(os.environ["LCQ_DATABASE_URL"])
+                        item = update_session.query(LegacyCQ).get(lcq.id)
+                        item.access_authorization = new_access
+                        update_session.commit()
+                        update_session.close()
+                        st.success("Access updated")
+                        st.rerun()
+                    if st.button("Delete", key=f"delete_trans_{lcq.id}"):
+                        delete_session = get_session(os.environ["LCQ_DATABASE_URL"])
+                        item = delete_session.query(LegacyCQ).get(transcription.id)
+                        delete_session.delete(item)
+                        delete_session.commit()
+                        delete_session.close()
+                        st.success("Legacy Tanscription removed")
+                        st.rerun()
+                    session_transcription.close()
+                else:
+                    st.write("You must be the guardian of a document to change its attributes.")
 
         # Upload Section
         with st.expander("Upload documents"):
             if st.session_state.is_guest:
                 st.write("Register to upload document")
             else:
-                st.subheader("Upload CQ, Transcription or Legacy CQ")
-                upload_type = st.selectbox("Select Upload Type", ["CQ", "Transcription", "Legacy CQ"])
+                st.subheader("Upload CQ, DIG4EL Transcription or Legacy Transcription")
+                upload_type = st.selectbox("Select Upload Type", ["CQ", "Transcription", "Legacy Transcription"])
                 uploaded_file = None
-                if upload_type == "Legacy CQ":
-                    uploaded_file = st.file_uploader("Legacy CQ File")
+                if upload_type == "Legacy Transcription":
+                    uploaded_file = st.file_uploader("Legacy Transcription File")
                     interviewer_name = st.text_input("Interviewer name")
                     consultant_name = st.text_input("Consultant name")
                     consultant_auth = st.checkbox(
@@ -364,7 +379,7 @@ def main():
                                 st.success("Transcription data uploaded successfully!")
                 else:
                     if uploaded_file and upload_access_authorization:
-                        if upload_type == "Legacy CQ":
+                        if upload_type == "Legacy Transcription":
                             session = get_session(os.environ["LCQ_DATABASE_URL"])
                             existing = session.query(LegacyCQ).filter(LegacyCQ.filename == uploaded_file.name).order_by(
                                 LegacyCQ.version.desc()).first()
@@ -390,7 +405,7 @@ def main():
                         else:
                             json_data = None
                         if st.button("Upload"):
-                            if upload_type == "Legacy CQ":
+                            if upload_type == "Legacy Transcription":
                                 if not consultant_auth:
                                     st.error("Please confirm you have the consultant's authorization")
                                     session.close()
@@ -420,7 +435,7 @@ def main():
                                             session.add(new_lcq)
                                         session.commit()
                                         session.close()
-                                        st.success("Legacy CQ uploaded successfully!")
+                                        st.success("Legacy Transcription uploaded successfully!")
                             elif upload_type == "CQ" and json_data:
                                 session = get_session(os.environ["CQ_DATABASE_URL"])
                                 if existing_cq and confirm_update_cq != "Yes":
